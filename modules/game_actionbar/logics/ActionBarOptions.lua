@@ -159,6 +159,7 @@ function resetActionBar()
 end
 
 -- boton clean?
+-- boton clean?
 function resetSlots(slot)
     for _, actionbar in pairs(activeActionBars) do
         if actionbar:getId() == "actionbar." .. slot then
@@ -176,5 +177,10 @@ function resetSlots(slot)
             break
         end
     end
+end
+
+-- Alias para resetSlots (usado por actionbars.otui)
+function resetAction(slot)
+    resetSlots(slot)
 end
 

@@ -1913,7 +1913,6 @@ void Game::sendWeaponProficiencyApplyLua(const uint16_t itemId, const std::vecto
     }
     
     m_protocolGame->sendWeaponProficiencyApply(itemId, perks);
->>>>>>> pr1593
 }
 
 void Game::stashWithdraw(const uint16_t itemId, const uint32_t count, const uint8_t stackpos)
