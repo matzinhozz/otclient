@@ -61,6 +61,9 @@ namespace stdext
     long long to_number(std::string_view s);
     std::vector<long long> extractNumbers(std::string_view s);
 
+    /// Format damage/heal numbers with K/KK/KKK abbreviation (BR format)
+    [[nodiscard]] std::string formatDamageKK(uint64_t value);
+
     // always returns at least one element in vector
     [[nodiscard]] std::vector<std::string> split(std::string_view str, std::string_view separators = " ");
     template<typename T> std::vector<T> split(const std::string_view str, const std::string_view separators = " ")

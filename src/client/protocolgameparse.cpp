@@ -43,6 +43,7 @@
 #include "paperdoll.h"
 #include <fmt/format.h>
 #include <framework/util/stats.h>
+#include <framework/stdext/string.h>
 
 void ProtocolGame::parseMessage(const InputMessagePtr& msg)
 {
@@ -2884,7 +2885,7 @@ void ProtocolGame::parseTextMessage(const InputMessagePtr& msg)
                     continue;
                 }
 
-                g_map.addAnimatedText(std::make_shared<AnimatedText>(std::to_string(value[j]), color[j]), pos);
+                g_map.addAnimatedText(std::make_shared<AnimatedText>(stdext::formatDamageKK(value[j]), color[j]), pos);
             }
             break;
         }
@@ -2897,7 +2898,12 @@ void ProtocolGame::parseTextMessage(const InputMessagePtr& msg)
             const uint8_t color = msg->getU8();
             text = msg->getString();
 
-            g_map.addAnimatedText(std::make_shared<AnimatedText>(std::to_string(value), color), pos);
+            // Only format heal, not mana
+            if (mode == Otc::MessageHeal || mode == Otc::MessageHealOthers) {
+                g_map.addAnimatedText(std::make_shared<AnimatedText>(stdext::formatDamageKK(value), color), pos);
+            } else {
+                g_map.addAnimatedText(std::make_shared<AnimatedText>(std::to_string(value), color), pos);
+            }
             break;
         }
         case Otc::MessageExp:

@@ -109,4 +109,32 @@ namespace {
     }
 #endif
 
+    TEST(StringEncoding, FormatDamageKK)
+    {
+        // Test values < 1000
+        EXPECT_EQ(stdext::formatDamageKK(0), "0");
+        EXPECT_EQ(stdext::formatDamageKK(999), "999");
+
+        // Test K format (>= 1000 and < 1000000)
+        EXPECT_EQ(stdext::formatDamageKK(1000), "1K");
+        EXPECT_EQ(stdext::formatDamageKK(10000), "10K");
+        EXPECT_EQ(stdext::formatDamageKK(100000), "100K");
+        EXPECT_EQ(stdext::formatDamageKK(1500), "1.5K");
+        EXPECT_EQ(stdext::formatDamageKK(2500), "2.5K");
+        EXPECT_EQ(stdext::formatDamageKK(999999), "999.9K");
+
+        // Test KK format (>= 1000000 and < 1000000000)
+        EXPECT_EQ(stdext::formatDamageKK(1000000), "1KK");
+        EXPECT_EQ(stdext::formatDamageKK(10000000), "10KK");
+        EXPECT_EQ(stdext::formatDamageKK(100000000), "100KK");
+        EXPECT_EQ(stdext::formatDamageKK(2500000), "2.5KK");
+        EXPECT_EQ(stdext::formatDamageKK(15000000), "15KK");
+        EXPECT_EQ(stdext::formatDamageKK(999999999), "999.9KK");
+
+        // Test KKK format (>= 1000000000)
+        EXPECT_EQ(stdext::formatDamageKK(1000000000), "1KKK");
+        EXPECT_EQ(stdext::formatDamageKK(10000000000ULL), "10KKK");
+        EXPECT_EQ(stdext::formatDamageKK(2500000000ULL), "2.5KKK");
+    }
+
 }
