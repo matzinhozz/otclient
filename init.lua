@@ -11,7 +11,7 @@ Services = {
 }
 
 Servers_init = {
-    ["http://127.0.0.1/login.php"] = {
+    ["http://http://168.227.239.56/login.php"] = {
         ["port"] = 80,
         ["protocol"] = 1511,
         ["httpLogin"] = true
