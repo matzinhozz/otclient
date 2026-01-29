@@ -21,6 +21,7 @@ local autoTargetModes = {
   ["G"] = 7,
   ["H"] = 8
 }
+local Options = {}
 
 local function deepCopy(original)
   local copy = {}
@@ -2059,6 +2060,7 @@ function isMagicShooterActive()
 end
 
 function toggleMagicShooter(widget, message)
+  print("DEBUG: toggleMagicShooter called")
   local shooterTracker = helperTracker:recursiveGetChildById("shooterStatus")
   if not widget then
     widget = shooterPanel:recursiveGetChildById("enableMagicShooter")
@@ -2346,6 +2348,64 @@ function isSpellOnCooldown(spell)
   return false
 end
 
+function getMonstersInArea(category, posOrCreature, pattern, minHp, maxHp, safePattern, monsterNamesTable)
+  -- monsterNamesTable can be nil
+  local monsters = 0
+  local t = {}
+  if monsterNamesTable == true or not monsterNamesTable then
+    t = {}
+  else
+    t = monsterNamesTable
+  end
+
+  if safePattern then
+    for i, spec in pairs(g_map.getSpectators(posOrCreature, safePattern)) do
+      if spec ~= player and (spec:isPlayer() and not spec:isPartyMember()) then
+        return 0
+      end
+    end
+  end
+
+  if category == 1 or category == 3 or category == 4 then
+    if category == 1 or category == 3 then
+      local name = getTarget() and getTarget():getName()
+      if #t ~= 0 and not table.find(t, name, true) then
+        return 0
+      end
+    end
+    for i, spec in pairs(g_map.getSpectators()) do
+      local specHp = spec:getHealthPercent()
+      local name = spec:getName():lower()
+      monsters = spec:isMonster() and specHp >= minHp and specHp <= maxHp and (#t == 0 or table.find(t, name, true)) and
+                 (g_game.getClientVersion() < 960 or spec:getType() < 3) and monsters + 1 or monsters
+    end
+    return monsters
+  end
+
+  for i, spec in pairs(g_map.getSpectators(posOrCreature, pattern)) do
+      if spec ~= player then
+        local specHp = spec:getHealthPercent()
+        local name = spec:getName():lower()
+        monsters = spec:isMonster() and specHp >= minHp and specHp <= maxHp and (#t == 0 or table.find(t, name)) and
+                   (g_game.getClientVersion() < 960 or spec:getType() < 3) and monsters + 1 or monsters
+      end
+  end
+
+  return monsters
+end
+
+local function monstersAround(position, radius)
+  return getMonstersInArea(
+    2,              -- category normal por área
+    position,
+    radius,
+    0,              -- minHp
+    100,            -- maxHp
+    false,          -- safePattern
+    nil             -- nomes
+  )
+end
+
 function checkMagicShooter()
   if not hotkeyHelperStatus then return end
   if not helperConfig.magicShooterEnabled then return end
@@ -2359,55 +2419,35 @@ function checkMagicShooter()
     if caster then
       caster:setChecked(false)
       toggleMagicShooter(caster, "Entering in a Protection Zone!\nRTCaster disabled.")
-      return
     end
+    return
   end
 
-  -- TODO: If needed implement afktime
-  -- local timer = g_ui.getActionTimer()
-  -- if timer > afkTime then
-  --   local widget = enableButtons:recursiveGetChildById("enableMagicShooter")
-  --   if widget then
-  --     widget:setChecked(false)
-  --     toggleMagicShooter(widget, "RTCaster disabled! \nDue to no changes in your actions so far.")
-  --     return
-  --   end
-  --   return
-  -- end
-
-  local following = g_game.getFollowingCreature()
-  if following then
+  if g_game.getFollowingCreature() then
     local widget = enableButtons:recursiveGetChildById("enableMagicShooter")
     if widget then
       widget:setChecked(false)
       toggleMagicShooter(widget, "Follow detected!\nRTCaster disabled.")
-      return
     end
+    return
   end
 
-  local position, direction = myCharacter:getPosition(), myCharacter:getDirection()
-  local creatureList = {}
-  local creaturesAround = 0
-  for i, creature in pairs(spectators) do
-    if creature:getPosition().z == position.z and getDistanceBetween(position, creature:getPosition()) <= 6 then
-      creaturesAround = creaturesAround + 1
-    end
-    table.insert(creatureList, {position = creature:getPosition(), creature = creature})
-  end
+  local position = myCharacter:getPosition()
+  local direction = myCharacter:getDirection()
 
   local unifiedList = {}
 
-  for i, shooter in ipairs(profile.spells) do
+  for _, shooter in ipairs(profile.spells) do
     local spell = shooter.id ~= 0 and Spells.getSpellByClientId(shooter.id) or nil
     if spell then
-      table.insert(unifiedList, {type = "spell", spell = spell, config = shooter})
+      table.insert(unifiedList, { type = "spell", spell = spell, config = shooter })
     end
   end
 
-  for i, runeConfig in ipairs(profile.runes) do
+  for _, runeConfig in ipairs(profile.runes) do
     local runeSpell = Spells.getRuneSpellByItem(runeConfig.id)
     if runeSpell then
-      table.insert(unifiedList, {type = "rune", rune = runeSpell, config = runeConfig})
+      table.insert(unifiedList, { type = "rune", rune = runeSpell, config = runeConfig })
     end
   end
 
@@ -2422,66 +2462,66 @@ function checkMagicShooter()
     end
 
     local target = g_game.getAttackingCreature()
-    local positionTarget = target and target:getPosition() or {x = 0xFFFF, y = 0xFFFF, z = 0xFF}
+    local targetPos = target and target:getPosition() or position
 
     if entry.type == "spell" then
-      local castOnFoot = false
       local spell = entry.spell
       local config = entry.config
-      local reachableCreatures = 0
       local targetable = (spell.range and spell.range > 0) or table.contains(bothCastTypeSpells, spell.id)
 
-      if player:getMana() < spell.mana or (targetable and not target) then
-        goto continue
-      elseif not table.contains(spell.vocations, translateVocation(myCharacter:getVocation())) then
-        goto continue
-      elseif spell.spender and harmonyCount < 5 then
+      if player:getMana() < spell.mana then
         goto continue
       end
 
-      if config and percentageMana >= config.percent then
-        if targetable and not config.selfCast then
-          if not positionTarget or positionTarget.z ~= position.z or not target:canBeSeen() then
-            goto continue
-          end
-          local range = spell.range or 3
+      if targetable and not target and not config.selfCast then
+        goto continue
+      end
 
-          if target and target:getCollisionSquare() > 1 then
-            positionTarget = getRelativePosition(positionTarget)
-          end
+      if not table.contains(spell.vocations, translateVocation(myCharacter:getVocation())) then
+        goto continue
+      end
 
-          if target and range >= getDistanceBetween(position, positionTarget) then
-            if spell.area then
-              reachableCreatures = countAttackableCreatures(positionTarget, 1, spell.area, creatureList, true)
-            elseif not spell.area then
-              reachableCreatures = 1
-            end
-          end
-        elseif spell.area then
-          reachableCreatures = countAttackableCreatures(position, direction, spell.area, creatureList, false)
-          if table.contains(bothCastTypeSpells, spell.id) and reachableCreatures >= config.creatures then
-            castOnFoot = true
-          end
-        end
+      if spell.spender and harmonyCount < 5 then
+        goto continue
+      end
 
-        if reachableCreatures >= config.creatures then
+      if percentageMana < config.percent then
+        goto continue
+      end
 
-          if not table.contains(bothCastTypeSpells, spell.id) and not config.forceCast and (targetable and creaturesAround > 1) then
-            goto continue
-          end
+      if isSpellOnCooldown(spell) then
+        goto continue
+      end
 
-          if (isSpellOnCooldown(spell)) then
-            goto continue
-          end
+      local countPos = config.selfCast and position or targetPos
+      local radius = spell.area or 1
 
-          g_game.talk(spell.words, true, castOnFoot)
+      local monsters = getMonstersInArea(
+        2,
+        countPos,
+        radius,
+        0,
+        100,
+        false,
+        nil
+      )
 
-          -- --- precooldown
-          onSpellCooldown(spell.id, 500)
-          for group,_ in pairs(spell.group) do
-            onSpellGroupCooldown(group, 500)
-          end
-        end
+      if monsters < config.creatures then
+        goto continue
+      end
+
+      if not table.contains(bothCastTypeSpells, spell.id)
+         and not config.forceCast
+         and targetable
+         and getMonstersInArea(2, position, 6, 0, 100, false, nil) > 1 then
+        goto continue
+      end
+
+      g_game.talk(spell.words, true, config.selfCast)
+
+      onSpellCooldown(spell.id, 500)
+      for group, _ in pairs(spell.group) do
+        onSpellGroupCooldown(group, 500)
       end
 
     elseif entry.type == "rune" then
@@ -2491,33 +2531,47 @@ function checkMagicShooter()
 
       local runeSpell = entry.rune
       local config = entry.config
-      local runeCount = myCharacter:getInventoryCount(config.id)
-      if runeCount > 0 then
-        local bestTarget = nil
-        local maxCreaturesHit = 0
-        if runeSpell.area then
-          bestTarget, maxCreaturesHit = findBestTarget(position, direction, runeSpell.area, creatureList, config.creatures)
-        elseif not runeSpell.area then
-          bestTarget = target and (isWithinReach(position, positionTarget) and g_map.isSightClear(position, positionTarget)) and target or nil
-        end
-        if bestTarget then
-          if not config.forceCast and (not runeSpell.area and creaturesAround > 1) then
-            goto continue
-          end
 
-          if isSpellOnCooldown(runeSpell) then
-            goto continue
-          end
-
-          g_game.useInventoryItemWith(config.id, bestTarget, 0, true)
-          -- precooldown
-          onSpellGroupCooldown(runeSpell.group, 500)
-        end
+      if myCharacter:getInventoryCount(config.id) <= 0 then
+        goto continue
       end
+
+      if isSpellOnCooldown(runeSpell) then
+        goto continue
+      end
+
+      if not target then
+        goto continue
+      end
+
+      local monsters = getMonstersInArea(
+        2,
+        targetPos,
+        runeSpell.area or 1,
+        0,
+        100,
+        false,
+        nil
+      )
+
+      if monsters < config.creatures then
+        goto continue
+      end
+
+      if not config.forceCast
+         and not runeSpell.area
+         and getMonstersInArea(2, position, 6, 0, 100, false, nil) > 1 then
+        goto continue
+      end
+
+      g_game.useInventoryItemWith(config.id, target, 0, true)
+      onSpellGroupCooldown(runeSpell.group, 500)
     end
+
     ::continue::
   end
 end
+
 
 eventTable.checkMagicShooter.action = checkMagicShooter
 
@@ -2573,8 +2627,12 @@ function checkAutoTarget()
   end
 
   local creatureList = {}
-  for i, creature in pairs(spectators) do
-    table.insert(creatureList, {position = creature:getPosition(), creature = creature})
+
+  local specs = g_map.getSpectators(position, false)
+  for i, creature in pairs(specs) do
+    if creature:isMonster() then
+      table.insert(creatureList, {position = creature:getPosition(), creature = creature})
+    end
   end
 
   local monsters = {}
