@@ -12,6 +12,8 @@ function UIProgressBarSD.create()
   progressbar.bgBorderRight = 0
   progressbar.bgBorderTop = 0
   progressbar.bgBorderBottom = 0
+  progressbar:insertLuaCall("onSetup")
+  progressbar:insertLuaCall("onGeometryChange")
   return progressbar
 end
 
@@ -64,11 +66,12 @@ function UIProgressBarSD:updateBackground()
     local width = math.round(math.max((self:getProgress() * (self:getWidth() - self.bgBorderLeft - self.bgBorderRight)), 1))
     local height = self:getHeight() - self.bgBorderTop - self.bgBorderBottom
     local rect = { x = self.bgBorderLeft, y = self.bgBorderTop, width = width, height = height }
+    self:setImageRect(rect)
 
     if width == 1 then
-      self:setImageSource('')
+      self:setImageVisible(false)
     else
-      self:setImageRect(rect)
+      self:setImageVisible(true)
     end
   end
 end
