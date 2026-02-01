@@ -21,7 +21,6 @@ local autoTargetModes = {
   ["G"] = 7,
   ["H"] = 8
 }
-local Options = {}
 
 local function deepCopy(original)
   local copy = {}
@@ -95,6 +94,9 @@ local function getDistanceBetween(p1, p2)
 end
 
 local function positionCompare(position1, position2)
+  if not position1 or not position2 then
+    return false
+  end
   return position1.x == position2.x and position1.y == position2.y and position1.z == position2.z
 end
 
@@ -162,7 +164,6 @@ helperConfig = {
 
   terms = false,
   autoEatFood = false,
-  autoReconnect = false,
   autoChangeGold = false,
   magicShooterEnabled = false,
   magicShooterOnHold = false,
@@ -680,17 +681,20 @@ end
 --[[ Events ]]--
 function assignTrainingSpell(button, isHaste)
   local radio = UIRadioGroup.create()
-  local window = g_ui.loadUI('styles/spell.otui', g_ui.getRootWidget())
+  window = g_ui.loadUI('styles/spell', g_ui.getRootWidget())
+  if not window then
+    return true
+  end
 
   window:show(true)
   window:raise()
   window:focus()
   helper:hide()
 
-  window:setText(isHaste and "Assign Haste Spell" or "Assign Training Spell")
+  local windowHeader = isHaste and "Assign Haste Spell" or "Assign Training Spell"
+  window:setText(windowHeader)
 
   local playerVocation = translateVocation(player:getVocation())
-  local playerLevel = player:getLevel()
   local spells = modules.gamelib.SpellInfo['Default']
   local iconsSource = SpelllistSettings['Default'].iconFile
 
@@ -699,24 +703,18 @@ function assignTrainingSpell(button, isHaste)
       goto continue
     end
 
-    if not isHaste then
-      local groups = Spells.getGroupIds(spellData)
-      if not (table.contains(groups, 2) or table.contains(groups, 3)) then
-        goto continue
-      end
-      if table.contains(hasteWhiteList[playerVocation], spellData.id) then
-        goto continue
-      end
+    if not isHaste and not (table.contains(Spells.getGroupIds(spellData), 3) or table.contains(Spells.getGroupIds(spellData), 2)) then
+      goto continue
     end
 
-    if table.contains(spellData.vocations, playerVocation)
-      and not ignoredTrainingSpells[spellData.id] then
+    if not isHaste and table.contains(hasteWhiteList[playerVocation], spellData.id) then
+      goto continue
+    end
 
+    if table.contains(spellData.vocations, playerVocation) and not ignoredTrainingSpells[spellData.id] then
       local widget = g_ui.createWidget('SpellPreview', window.contentPanel.spellList)
-      local spellId = spellData.clientId
-      if not spellId then goto continue end
-
-      local clip = Spells.getImageClip(spellId)
+      local clientId = spellData.clientId
+      local clip = Spells.getImageClip(clientId)
 
       radio:addWidget(widget)
       widget:setId(spellData.id)
@@ -732,7 +730,9 @@ function assignTrainingSpell(button, isHaste)
       if spellData.level then
         widget.levelLabel:setVisible(true)
         widget.levelLabel:setText(string.format("Level: %d", spellData.level))
-        widget.image.gray:setVisible(playerLevel < spellData.level)
+        if player:getLevel() < spellData.level then
+          widget.image.gray:setVisible(true)
+        end
       end
 
       local primaryGroup = Spells.getPrimaryGroup(spellData)
@@ -746,13 +746,15 @@ function assignTrainingSpell(button, isHaste)
     ::continue::
   end
 
+  -- Order the spell list
   local widgets = window.contentPanel.spellList:getChildren()
   table.sort(widgets, function(a, b) return a:getText() < b:getText() end)
   for i, widget in ipairs(widgets) do
     window.contentPanel.spellList:moveChildToIndex(widget, i)
   end
 
-  radio.onSelectionChange = function(_, selected)
+  -- Callback of radio
+  radio.onSelectionChange = function(widget, selected)
     if selected then
       window.contentPanel.preview:setText(selected:getText())
       window.contentPanel.preview.image:setImageSource(selected.source)
@@ -760,33 +762,37 @@ function assignTrainingSpell(button, isHaste)
       window.contentPanel.paramLabel:setOn(selected.param)
       window.contentPanel.paramText:setEnabled(selected.param)
       window.contentPanel.paramText:clearText()
-      window.contentPanel.spellList:ensureChildVisible(selected)
+      window.contentPanel.spellList:ensureChildVisible(widget)
     end
   end
 
-  if #widgets > 0 then
-    radio:selectWidget(widgets[1])
+  if window.contentPanel.spellList:getChildren() then
+    radio:selectWidget(window.contentPanel.spellList:getChildren()[1])
   end
 
   local okFunc = function(destroy)
     local selected = radio:getSelectedWidget()
     if not selected then return end
 
+    local spellIcon = selected.source
+    local spellClip = selected.clip
+    local spellId = selected:getId()
     local spellName = selected:getText():match("^(.-)\n")
     local spellWords = selected:getText():match("\n(.+)")
-    local spellId = tonumber(selected:getId())
 
+    local slotID = tonumber(button:getId():match("%d+"))
     if isHaste then
-      helperConfig.haste[1].id = spellId
+      helperConfig.haste[1].id = tonumber(spellId)
     else
-      helperConfig.training[1].id = spellId
+      helperConfig.training[1].id = tonumber(spellId)
       if helperConfig.training[1].percent == 0 then
         helperConfig.training[1].percent = 100
+        updateTrainingPercent('spellTrainingButton0', helperConfig.training[1].percent)
       end
     end
 
-    button:setImageSource(selected.source)
-    button:setImageClip(selected.clip)
+    button:setImageSource(spellIcon)
+    button:setImageClip(spellClip)
     button:setBorderColorTop("#1b1b1b")
     button:setBorderColorLeft("#1b1b1b")
     button:setBorderColorRight("#757575")
@@ -811,7 +817,6 @@ function assignTrainingSpell(button, isHaste)
   window.contentPanel.onEnter = function() okFunc(true) end
   window.onEscape = cancelFunc
 end
-
 
 local function invalidPresetName(name)
   if helperConfig.shooterProfiles[name] then
@@ -848,7 +853,6 @@ function sendRenameOrAddWindow(isRename)
   window:raise()
   window:focus()
   window.contentPanel.target:focus()
-  -- g_client.setInputLockWidget(window)
   helper:hide()
 
   local onWrite = function()
@@ -915,7 +919,6 @@ function sendRenameOrAddWindow(isRename)
 
   local cancel = function()
     helper:show()
-    -- g_client.setInputLockWidget(nil)
 		window:destroy()
 	end
 
@@ -932,19 +935,21 @@ function sendRenameOrAddWindow(isRename)
 end
 
 function assignSpell(button, groupName, groups, tableToAssign)
-  local radio = UIRadioGroup.create()
-  local window = g_ui.loadUI('styles/spell.otui', g_ui.getRootWidget())
-  if not window then return true end
+	local radio = UIRadioGroup.create()
+	window = g_ui.loadUI('styles/spell', g_ui.getRootWidget())
+  if not window then
+    return true
+  end
 
-  window:show(true)
-  window:raise()
-  window:focus()
+	window:show(true)
+	window:raise()
+	window:focus()
   helper:hide()
 
-  window:setText("Assign " .. groupName .. " Spell")
+	window:setText("Assign " .. groupName .. " Spell")
 
   local profile = getShooterProfile()
-  local playerVocation = translateVocation(player:getVocation())
+	local playerVocation = translateVocation(player:getVocation())
   local playerLevel = player:getLevel()
   local spells = modules.gamelib.SpellInfo['Default']
   local iconsSource = SpelllistSettings['Default'].iconFile
@@ -962,7 +967,7 @@ function assignSpell(button, groupName, groups, tableToAssign)
     local groupIds = Spells.getGroupIds(spellData)
     local clientId = spellData.clientId
     local serverId = spellData.id
-
+    
     if containsAnyGroup(groupIds, groups)
       and table.contains(spellData.vocations, playerVocation)
       and not ignoredSpellsIds[serverId]
@@ -982,60 +987,71 @@ function assignSpell(button, groupName, groups, tableToAssign)
       widget.image:setImageSource(widget.source)
       widget.image:setImageClip(widget.clip)
 
-      widget.levelLabel:setVisible(true)
-      widget.levelLabel:setText(string.format("Level: %d", spellData.level))
+          if spellData.level then
+            widget.levelLabel:setVisible(true)
+            widget.levelLabel:setText(string.format("Level: %d", spellData.level))
+            if player:getLevel() < spellData.level then
+              widget.image.gray:setVisible(true)
+            end
+          end
 
-      local primaryGroup = Spells.getPrimaryGroup(spellData)
-      if primaryGroup ~= -1 then
-        local offSet = (primaryGroup == 2 and 20) or (primaryGroup == 3 and 40) or 0
-        widget.imageGroup:setImageClip(offSet .. " 0 20 20")
-        widget.imageGroup:setVisible(true)
+          local primaryGroup = Spells.getPrimaryGroup(spellData)
+          if primaryGroup ~= -1 then
+            local offSet = (primaryGroup == 2 and 20) or (primaryGroup == 3 and 40) or 0
+            widget.imageGroup:setImageClip(offSet .. " 0 20 20")
+            widget.imageGroup:setVisible(true)
+          end
       end
-    end
+      ::continue::
   end
 
-  -- ordenar
-  local widgets = window.contentPanel.spellList:getChildren()
-  table.sort(widgets, function(a, b) return a:getText() < b:getText() end)
-  for i, widget in ipairs(widgets) do
-    window.contentPanel.spellList:moveChildToIndex(widget, i)
-  end
+	-- sort alphabetically
+	local widgets = window.contentPanel.spellList:getChildren()
+	table.sort(widgets, function(a, b) return a:getText() < b:getText() end)
+	for i, widget in ipairs(widgets) do
+		window.contentPanel.spellList:moveChildToIndex(widget, i)
+	end
 
-  radio.onSelectionChange = function(_, selected)
-    if selected then
-      window.contentPanel.preview:setText(selected:getText())
-      window.contentPanel.preview.image:setImageSource(selected.source)
-      window.contentPanel.preview.image:setImageClip(selected.clip)
-      window.contentPanel.spellList:ensureChildVisible(selected)
-    end
-  end
+	-- callback
+	radio.onSelectionChange = function(widget, selected)
+		if selected then
+			window.contentPanel.preview:setText(selected:getText())
+			window.contentPanel.preview.image:setImageSource(selected.source)
+			window.contentPanel.preview.image:setImageClip(selected.clip)
+			window.contentPanel.paramLabel:setOn(selected.param)
+			window.contentPanel.paramText:setEnabled(selected.param)
+			window.contentPanel.paramText:clearText()
+			window.contentPanel.spellList:ensureChildVisible(widget)
+		end
+	end
 
-  if #widgets > 0 then
-    radio:selectWidget(widgets[1])
-  end
+	if window.contentPanel.spellList:getChildren() then
+		radio:selectWidget(window.contentPanel.spellList:getChildren()[1])
+	end
 
   window:recursiveGetChildById('tick'):setChecked(true)
   window:recursiveGetChildById('tick'):setEnabled(false)
 
-  local okFunc = function(destroy)
+  local okFunc = function(destroy, profile)
     local selected = radio:getSelectedWidget()
     if not selected then return end
 
-    local spellId = tonumber(selected:getId())
+    local profile = getShooterProfile()
+    local spellIcon = selected.source
+    local spellClip = selected.clip
+    local spellId = selected:getId()
     local spellName = selected:getText():match("^(.-)\n")
     local spellWords = selected:getText():match("\n(.+)")
 
     local slotID = tonumber(button:getId():match("%d+"))
-    
-    -- ✅ CORRIGIDO: Usa spellId em vez de serverId
     if button:getId():find("attackSpellButton") then
-      profile.spells[slotID + 1].id = spellId
+      profile.spells[slotID + 1].id = tonumber(spellId)
     else
-      tableToAssign[slotID + 1].id = spellId
+      tableToAssign[slotID + 1].id = tonumber(spellId)
     end
 
-    button:setImageSource(selected.source)
-    button:setImageClip(selected.clip)
+    button:setImageSource(spellIcon)
+    button:setImageClip(spellClip)
     button:setBorderColorTop("#1b1b1b")
     button:setBorderColorLeft("#1b1b1b")
     button:setBorderColorRight("#757575")
@@ -1043,73 +1059,67 @@ function assignSpell(button, groupName, groups, tableToAssign)
     button:setBorderWidth(1)
     button:setTooltip("Spell: " .. spellName .. "\nWords: " .. spellWords)
 
-    -- ✅ CORRIGIDO: Busca o spell novamente para ter os dados completos
     if button:getId():find("attackSpellButton") then
+      local creaturesMin = shooterPanel:recursiveGetChildById("countMinCreature" .. slotID)
+      local forceCast = shooterPanel:recursiveGetChildById("conditionSetting" .. slotID)
+      local selfCast = shooterPanel:recursiveGetChildById("selfCast" .. slotID)
       local spell = Spells.getSpellByClientId(tonumber(spellId))
-      print("Assigned spell ID:", spellId)
-      
       if spell then
-        local creaturesMin = shooterPanel:recursiveGetChildById("countMinCreature" .. slotID)
-        local forceCast = shooterPanel:recursiveGetChildById("conditionSetting" .. slotID)
-        local selfCast = shooterPanel:recursiveGetChildById("selfCast" .. slotID)
-
-        if table.contains(bothCastTypeSpells, spell.id) and not selfCast then
-          selfCast = g_ui.createWidget('CheckBox', creaturesMin:getParent())
-          selfCast:mergeStyle({
-            ["width"] = 12,
-            ["anchors.top"] = "countMinCreature" .. slotID .. ".top",
-            ["anchors.left"] = "countMinCreature" .. slotID .. ".right",
-            ["margin-top"] = 6,
-            ["margin-left"] = 5
-          })
-          selfCast:setId('selfCast' .. slotID)
-          selfCast:setTooltip('Cast on yourself')
-          selfCast:setVisible(true)
-          selfCast.onCheckChange = function()
-            toggleSelfCast(slotID, selfCast:isChecked())
+          if table.contains(bothCastTypeSpells, spell.id) then -- divine grenade self cast
+            if not selfCast then
+              selfCast = g_ui.createWidget('CheckBox', creaturesMin:getParent())
+              local style = {
+                ["width"] = 12,
+                ["anchors.top"] = "countMinCreature" .. slotID .. ".top",
+                ["anchors.left"] = "countMinCreature" .. slotID .. ".right",
+                ["margin-top"] = 6,
+                ["margin-left"] = 5
+              }
+              selfCast:mergeStyle(style)
+              selfCast:setId('selfCast' .. slotID)
+              selfCast:setTooltip('Cast on yourself')
+              selfCast:setVisible(true)
+              selfCast.onCheckChange = function() toggleSelfCast(selfCast:getId():match("%d+"), selfCast:isChecked()) end
+            end
           end
-        end
-
-        if selfCast and not table.contains(bothCastTypeSpells, spell.id) then
-          profile.spells[slotID + 1].selfCast = false
-          selfCast:destroy()
-        end
-
-        if (spell.range > 0 or not spell.area)
-          and not table.contains(bothCastTypeSpells, spell.id) then
-
-          profile.spells[slotID + 1].creatures = 1
-          creaturesMin:setCurrentOption("1+")
-          creaturesMin:disable()
-          if forceCast then
-            forceCast:setVisible(true)
+          if selfCast and not table.contains(bothCastTypeSpells, spell.id) then
+            profile.spells[slotID + 1].selfCast = false
+            selfCast:destroy()
           end
-        else
-          creaturesMin:enable()
-          if forceCast then
-            forceCast:setVisible(false)
-            profile.spells[slotID + 1].forceCast = false
+          if (spell.range > 0 or not spell.area) and not table.contains(bothCastTypeSpells, spell.id) then
+            profile.spells[slotID + 1].creatures = 1
+            creaturesMin:setCurrentOption("1+")
+            creaturesMin:disable()
+            if forceCast then
+              forceCast:setChecked(profile.spells[slotID + 1].forceCast)
+              forceCast:setVisible(true)
+            end
+          else
+            creaturesMin:enable()
+            if forceCast then
+              forceCast:setChecked(false)
+              forceCast:setVisible(false)
+              profile.spells[slotID + 1].forceCast = false
+            end
           end
         end
       end
-    end
-
     if destroy then
-      helper:show(true)
+      helper:show()
       window:destroy()
     end
   end
 
-  local cancelFunc = function()
-    helper:show(true)
-    window:destroy()
-  end
+	local cancelFunc = function()
+    helper:show()
+		window:destroy()
+	end
 
-  window.contentPanel.buttonOk.onClick = function() okFunc(true) end
-  window.contentPanel.buttonApply.onClick = function() okFunc(false) end
-  window.contentPanel.buttonClose.onClick = cancelFunc
-  window.contentPanel.onEnter = function() okFunc(true) end
-  window.onEscape = cancelFunc
+	window.contentPanel.buttonOk.onClick = function() okFunc(true) end
+	window.contentPanel.buttonApply.onClick = function() okFunc(false) end
+	window.contentPanel.buttonClose.onClick = cancelFunc
+	window.contentPanel.onEnter = function() okFunc(true) end
+	window.onEscape = cancelFunc
 end
 
 function assignRune(button, groupName, groups, tableToAssign)
@@ -2060,7 +2070,6 @@ function isMagicShooterActive()
 end
 
 function toggleMagicShooter(widget, message)
-  print("DEBUG: toggleMagicShooter called")
   local shooterTracker = helperTracker:recursiveGetChildById("shooterStatus")
   if not widget then
     widget = shooterPanel:recursiveGetChildById("enableMagicShooter")
@@ -2267,7 +2276,7 @@ local function countAttackableCreatures(casterPos, direction, area, creatureList
                   z = casterPos.z
               }
               for _, creature in ipairs(creatureList) do
-                  if positionCompare(creature.position, position) and (g_map.isSightClear(casterPos, creature.position)) then
+                  if creature.position and positionCompare(creature.position, position) and (g_map.isSightClear(casterPos, creature.position)) then
                       creatures = creatures + 1
                       break
                   end
@@ -2348,64 +2357,6 @@ function isSpellOnCooldown(spell)
   return false
 end
 
-function getMonstersInArea(category, posOrCreature, pattern, minHp, maxHp, safePattern, monsterNamesTable)
-  -- monsterNamesTable can be nil
-  local monsters = 0
-  local t = {}
-  if monsterNamesTable == true or not monsterNamesTable then
-    t = {}
-  else
-    t = monsterNamesTable
-  end
-
-  if safePattern then
-    for i, spec in pairs(g_map.getSpectators(posOrCreature, safePattern)) do
-      if spec ~= player and (spec:isPlayer() and not spec:isPartyMember()) then
-        return 0
-      end
-    end
-  end
-
-  if category == 1 or category == 3 or category == 4 then
-    if category == 1 or category == 3 then
-      local name = getTarget() and getTarget():getName()
-      if #t ~= 0 and not table.find(t, name, true) then
-        return 0
-      end
-    end
-    for i, spec in pairs(g_map.getSpectators()) do
-      local specHp = spec:getHealthPercent()
-      local name = spec:getName():lower()
-      monsters = spec:isMonster() and specHp >= minHp and specHp <= maxHp and (#t == 0 or table.find(t, name, true)) and
-                 (g_game.getClientVersion() < 960 or spec:getType() < 3) and monsters + 1 or monsters
-    end
-    return monsters
-  end
-
-  for i, spec in pairs(g_map.getSpectators(posOrCreature, pattern)) do
-      if spec ~= player then
-        local specHp = spec:getHealthPercent()
-        local name = spec:getName():lower()
-        monsters = spec:isMonster() and specHp >= minHp and specHp <= maxHp and (#t == 0 or table.find(t, name)) and
-                   (g_game.getClientVersion() < 960 or spec:getType() < 3) and monsters + 1 or monsters
-      end
-  end
-
-  return monsters
-end
-
-local function monstersAround(position, radius)
-  return getMonstersInArea(
-    2,              -- category normal por área
-    position,
-    radius,
-    0,              -- minHp
-    100,            -- maxHp
-    false,          -- safePattern
-    nil             -- nomes
-  )
-end
-
 function checkMagicShooter()
   if not hotkeyHelperStatus then return end
   if not helperConfig.magicShooterEnabled then return end
@@ -2419,35 +2370,54 @@ function checkMagicShooter()
     if caster then
       caster:setChecked(false)
       toggleMagicShooter(caster, "Entering in a Protection Zone!\nRTCaster disabled.")
+      return
     end
-    return
   end
 
-  if g_game.getFollowingCreature() then
+  -- local timer = g_ui.getActionTimer()
+  -- if timer > afkTime then
+  --   local widget = enableButtons:recursiveGetChildById("enableMagicShooter")
+  --   if widget then
+  --     widget:setChecked(false)
+  --     toggleMagicShooter(widget, "RTCaster disabled! \nDue to no changes in your actions so far.")
+  --     return
+  --   end
+  --   return
+  -- end
+
+  local following = g_game.getFollowingCreature()
+  if following then
     local widget = enableButtons:recursiveGetChildById("enableMagicShooter")
     if widget then
       widget:setChecked(false)
       toggleMagicShooter(widget, "Follow detected!\nRTCaster disabled.")
+      return
     end
-    return
   end
 
-  local position = myCharacter:getPosition()
-  local direction = myCharacter:getDirection()
+  local position, direction = myCharacter:getPosition(), myCharacter:getDirection()
+  local creatureList = {}
+  local creaturesAround = 0
+  for i, creature in pairs(spectators) do
+    if creature:getPosition().z == position.z and getDistanceBetween(position, creature:getPosition()) <= 6 then
+      creaturesAround = creaturesAround + 1
+    end
+    table.insert(creatureList, {position = creature:getPosition(), creature = creature})
+  end
 
   local unifiedList = {}
 
-  for _, shooter in ipairs(profile.spells) do
+  for i, shooter in ipairs(profile.spells) do
     local spell = shooter.id ~= 0 and Spells.getSpellByClientId(shooter.id) or nil
     if spell then
-      table.insert(unifiedList, { type = "spell", spell = spell, config = shooter })
+      table.insert(unifiedList, {type = "spell", spell = spell, config = shooter})
     end
   end
 
-  for _, runeConfig in ipairs(profile.runes) do
+  for i, runeConfig in ipairs(profile.runes) do
     local runeSpell = Spells.getRuneSpellByItem(runeConfig.id)
     if runeSpell then
-      table.insert(unifiedList, { type = "rune", rune = runeSpell, config = runeConfig })
+      table.insert(unifiedList, {type = "rune", rune = runeSpell, config = runeConfig})
     end
   end
 
@@ -2462,18 +2432,25 @@ function checkMagicShooter()
     end
 
     local target = g_game.getAttackingCreature()
-    local targetPos = target and target:getPosition() or position
+    local positionTarget = target and target:getPosition() or {x = 0xFFFF, y = 0xFFFF, z = 0xFF}
+
 
     if entry.type == "spell" then
+
+      local castOnFoot = false
       local spell = entry.spell
       local config = entry.config
+      local reachableCreatures = 0
+
       local targetable = (spell.range and spell.range > 0) or table.contains(bothCastTypeSpells, spell.id)
+
 
       if player:getMana() < spell.mana then
         goto continue
       end
 
       if targetable and not target and not config.selfCast then
+
         goto continue
       end
 
@@ -2485,43 +2462,52 @@ function checkMagicShooter()
         goto continue
       end
 
-      if percentageMana < config.percent then
-        goto continue
-      end
+      if config and percentageMana >= config.percent then
+        if targetable and not config.selfCast then
 
-      if isSpellOnCooldown(spell) then
-        goto continue
-      end
+          if not positionTarget or positionTarget.z ~= position.z or not target:canBeSeen() then
+            goto continue
+          end
+          local range = spell.range or 3
 
-      local countPos = config.selfCast and position or targetPos
-      local radius = spell.area or 1
+          if target and target:getCollisionSquare() > 1 then
+            positionTarget = getRelativePosition(positionTarget)
+          end
 
-      local monsters = getMonstersInArea(
-        2,
-        countPos,
-        radius,
-        0,
-        100,
-        false,
-        nil
-      )
+          if target and range >= getDistanceBetween(position, positionTarget) then
+            if spell.area then
+              reachableCreatures = countAttackableCreatures(positionTarget, 1, spell.area, creatureList, true)
+            elseif not spell.area then
+              reachableCreatures = 1
+            end
+          end
+        elseif spell.area then
 
-      if monsters < config.creatures then
-        goto continue
-      end
+          reachableCreatures = countAttackableCreatures(position, direction, spell.area, creatureList, false)
+          if table.contains(bothCastTypeSpells, spell.id) and reachableCreatures >= config.creatures then
+            castOnFoot = true
+          end
+        end
 
-      if not table.contains(bothCastTypeSpells, spell.id)
-         and not config.forceCast
-         and targetable
-         and getMonstersInArea(2, position, 6, 0, 100, false, nil) > 1 then
-        goto continue
-      end
+        if reachableCreatures >= config.creatures then
 
-      g_game.talk(spell.words, true, config.selfCast)
 
-      onSpellCooldown(spell.id, 500)
-      for group, _ in pairs(spell.group) do
-        onSpellGroupCooldown(group, 500)
+          if not table.contains(bothCastTypeSpells, spell.id) and not config.forceCast and (targetable and creaturesAround > 1) then
+            goto continue
+          end
+
+          if (isSpellOnCooldown(spell)) then
+            goto continue
+          end
+
+          g_game.talk(spell.words, true, castOnFoot)
+
+          -- --- precooldown
+          onSpellCooldown(spell.id, 500)
+          for group,_ in pairs(spell.group) do
+            onSpellGroupCooldown(group, 500)
+          end
+        end
       end
 
     elseif entry.type == "rune" then
@@ -2531,47 +2517,33 @@ function checkMagicShooter()
 
       local runeSpell = entry.rune
       local config = entry.config
+      local runeCount = myCharacter:getInventoryCount(config.id)
+      if runeCount > 0 then
+        local bestTarget = nil
+        local maxCreaturesHit = 0
+        if runeSpell.area then
+          bestTarget, maxCreaturesHit = findBestTarget(position, direction, runeSpell.area, creatureList, config.creatures)
+        elseif not runeSpell.area then
+          bestTarget = target and (isWithinReach(position, positionTarget) and g_map.isSightClear(position, positionTarget)) and target or nil
+        end
+        if bestTarget then
+          if not config.forceCast and (not runeSpell.area and creaturesAround > 1) then
+            goto continue
+          end
 
-      if myCharacter:getInventoryCount(config.id) <= 0 then
-        goto continue
+          if isSpellOnCooldown(runeSpell) then
+            goto continue
+          end
+
+          g_game.useInventoryItemWith(config.id, bestTarget, 0, true)
+          -- precooldown
+          onSpellGroupCooldown(runeSpell.group, 500)
+        end
       end
-
-      if isSpellOnCooldown(runeSpell) then
-        goto continue
-      end
-
-      if not target then
-        goto continue
-      end
-
-      local monsters = getMonstersInArea(
-        2,
-        targetPos,
-        runeSpell.area or 1,
-        0,
-        100,
-        false,
-        nil
-      )
-
-      if monsters < config.creatures then
-        goto continue
-      end
-
-      if not config.forceCast
-         and not runeSpell.area
-         and getMonstersInArea(2, position, 6, 0, 100, false, nil) > 1 then
-        goto continue
-      end
-
-      g_game.useInventoryItemWith(config.id, target, 0, true)
-      onSpellGroupCooldown(runeSpell.group, 500)
     end
-
     ::continue::
   end
 end
-
 
 eventTable.checkMagicShooter.action = checkMagicShooter
 
@@ -2592,7 +2564,6 @@ function checkAutoTarget()
     end
   end
 
-  -- TODO: Implement afktime if needed
   -- local timer = g_ui.getActionTimer()
   -- if timer > afkTime then
   --   local widget = enableButtons:recursiveGetChildById("enableAutoTarget")
@@ -2777,12 +2748,6 @@ function checkHealthPriority()
     end
   end
   return true
-end
-
-function toggleReconnect(checked)
-  local currentCharacterName = g_game.getCharacterName()
-  helperConfig.autoReconnect = checked
-  saveAutoReconnect(currentCharacterName, checked)
 end
 
 function onFriendHealing(localPlayer)
@@ -3233,7 +3198,6 @@ function onLoadHelperData()
   end
   loadShooterProfileByName(helperConfig.selectedShooterProfile)
   toolsPanel:recursiveGetChildById("eatFood"):setChecked(helperConfig.autoEatFood)
-  toolsPanel:recursiveGetChildById("reconnect"):setChecked(helperConfig.autoReconnect)
   toolsPanel:recursiveGetChildById("changeGold"):setChecked(helperConfig.autoChangeGold)
   enableButtons:recursiveGetChildById("enableMagicShooter"):setChecked(helperConfig.magicShooterEnabled)
   enableButtons:recursiveGetChildById("enableAutoTarget"):setChecked(helperConfig.autoTargetEnabled)
@@ -3302,7 +3266,6 @@ function loadSettings()
     }, selectedShooterProfile = "Default",
 
     autoEatFood = false,
-    autoReconnect = false,
     autoChangeGold = false,
     magicShooterEnabled = false,
     magicShooterOnHold = false,
@@ -3391,9 +3354,6 @@ function loadSettings()
 
     if not result.autoEatFood then
       helperConfig.autoEatFood = false
-    end
-    if not result.autoReconnect then
-      helperConfig.autoReconnect = false
     end
     if not result.autoChangeGold then
       helperConfig.autoChangeGold = false
@@ -3671,7 +3631,6 @@ function manageHotkeys(typo)
   assignWindow.display:setText(currentHotkey)
   assignWindow.desc:setText("Assign or edit a hotkey to manage Target/Shooter state.")
   assignWindow:setHeight(190)
-  -- g_client.setInputLockWidget(assignWindow)
 
   assignWindow.onKeyDown = function(assignWindow, keyCode, keyboardModifiers, keyText)
     local keyCombo = determineKeyComboDesc(keyCode, keyboardModifiers, keyText)
@@ -3706,7 +3665,6 @@ function manageHotkeys(typo)
         Options.removeActionHotkey(chatMode and "chatOn" or "chatOff", currentBind.jsonName, false)
         KeyBinds:setupAndReset(Options.currentHotkeySetName, chatMode and "chatOn" or "chatOff")
       end
-      -- g_client.setInputLockWidget(nil)
       assignWindow:destroy()
       return true
     end
@@ -3739,7 +3697,6 @@ function manageHotkeys(typo)
     end
 
     assignWindow:destroy()
-    -- g_client.setInputLockWidget(nil)
   end
 
   assignWindow.buttonClear.onClick = function()
@@ -3749,7 +3706,6 @@ function manageHotkeys(typo)
     end
 
     assignWindow:destroy()
-    -- g_client.setInputLockWidget(nil)
   end
 
   assignWindow.onDestroy = function(widget) helper:show(true) end
@@ -3894,8 +3850,7 @@ function onSetupDropSupport(widget, spellData, hasteSpell)
       helperConfig.training[1].id = tonumber(spellData.id)
       if helperConfig.training[1].percent == 0 then
         helperConfig.training[1].percent = 100
-        -- TODO: AJUSTAR
-        -- updateTrainingPercent('spellTrainingButton0', helperConfig.training[1].percent)
+        updateTrainingPercent('spellTrainingButton0', helperConfig.training[1].percent)
       end
     end
   end

@@ -1408,22 +1408,6 @@ ToolsPanel < Panel
         change-cursor-image: false
         $hover !disabled:
           color: #c0c0c0
-      CheckBox
-        id: reconnect
-        width: 110
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        !text: tr('Auto Reconnect')
-        margin-top: 7
-        margin-left: 2
-        font: Verdana Bold-11px
-        color: #c0c0c0
-        text-offset: 13 -3
-        text-auto-resize: true
-        @onCheckChange: toggleReconnect(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: #c0c0c0
 
 ShooterPanel < Panel
   anchors.fill: parent
