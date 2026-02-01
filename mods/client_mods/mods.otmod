@@ -11,3 +11,4 @@ Module
     - client_textedit
     - game_bot
     - game_wheel
+    - game_helper
