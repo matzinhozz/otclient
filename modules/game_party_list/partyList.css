@@ -1,0 +1,131 @@
+/* Party List - conforme HTML-CSS Integration Guide (border: width + color; sizes sem px) */
+.party-list-window {
+  position: relative;
+  width: 220;
+  min-height: 120;
+  max-height: 400;
+  display: block;
+  background-color: #323232;
+  border: 1 #505050;
+}
+
+.filter-panel {
+  width: 100%;
+  padding: 6;
+  display: block;
+  background-color: #2a2a2a;
+}
+
+.filter-buttons {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.filter-check {
+  display: inline-block;
+  margin: 2 4;
+  font-size: 11;
+  color: #c0c0c0;
+  cursor: pointer;
+}
+
+.filter-check input {
+  margin-right: 3;
+  vertical-align: middle;
+}
+
+.separator {
+  height: 4;
+  width: 100%;
+  background-color: #404040;
+}
+
+.party-panel {
+  width: 100%;
+  padding: 6;
+  overflow: scroll;
+  display: block;
+}
+
+.party-member-row {
+  display: block;
+  width: 100%;
+  min-height: 52;
+  padding: 4;
+  margin-bottom: 4;
+  background-color: #3a3a3a;
+  cursor: pointer;
+  border: 1 #505050;
+}
+
+.party-member-row:hover {
+  background-color: #454545;
+}
+
+.member-outfit {
+  display: inline-block;
+  width: 32;
+  height: 32;
+  vertical-align: top;
+  margin-right: 6;
+}
+
+.member-info {
+  display: inline-block;
+  width: 100%;
+  vertical-align: top;
+}
+
+.member-name {
+  display: block;
+  font-size: 12;
+  color: #e0e0e0;
+  margin-bottom: 4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-container {
+  display: block;
+  margin-bottom: 2;
+}
+
+.bar-label {
+  display: inline-block;
+  width: 22;
+  font-size: 10;
+  color: #a0a0a0;
+}
+
+.bar-bg {
+  display: inline-block;
+  width: 100%;
+  height: 8;
+  background-color: #252525;
+  vertical-align: middle;
+}
+
+.bar-fill {
+  height: 100%;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.bar-hp-fill {
+  background-color: #50a150;
+}
+
+.bar-hp-fill.low {
+  background-color: #a1a100;
+}
+
+.bar-hp-fill.critical {
+  background-color: #bf0a0a;
+}
+
+.bar-mp-fill {
+  background-color: #5050a0;
+}

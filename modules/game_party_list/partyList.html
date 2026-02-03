@@ -1,0 +1,68 @@
+<link href="partyList.css" />
+<script type="text">
+  self.partyMembers = {}
+  self.windowTitle = 'Party List'
+</script>
+<html>
+  <window id="partyWindow" placement="top-left" class="party-list-window" *title="self.windowTitle" onescape="self:close()">
+    <div id="filterPanel" class="filter-panel">
+      <div id="filterButtons" class="filter-buttons">
+        <label class="filter-check">
+          <input type="checkbox" id="showPlayers" *checked="self.filterShowPlayers" onchange="self:onFilterChange('showPlayers', event)" />
+          <span>Players</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showKnights" *checked="self.filterShowKnights" onchange="self:onFilterChange('showKnights', event)" />
+          <span>Knights</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showPaladins" *checked="self.filterShowPaladins" onchange="self:onFilterChange('showPaladins', event)" />
+          <span>Paladins</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showDruids" *checked="self.filterShowDruids" onchange="self:onFilterChange('showDruids', event)" />
+          <span>Druids</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showSorcerers" *checked="self.filterShowSorcerers" onchange="self:onFilterChange('showSorcerers', event)" />
+          <span>Sorcerers</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showMonks" *checked="self.filterShowMonks" onchange="self:onFilterChange('showMonks', event)" />
+          <span>Monks</span>
+        </label>
+        <label class="filter-check">
+          <input type="checkbox" id="showSummons" *checked="self.filterShowSummons" onchange="self:onFilterChange('showSummons', event)" />
+          <span>Summons</span>
+        </label>
+      </div>
+    </div>
+    <div id="separator" class="separator"></div>
+    <div id="partyPanel" class="party-panel" layout="type: verticalBox; spacing: 2">
+      <div
+        *for="local member in self.partyMembers"
+        class="party-member-row"
+        onmouserelease="self:onMemberClick(member, event)"
+      >
+        <div class="member-outfit">
+          <uicreature *outfit="{type = member.lookType}"></uicreature>
+        </div>
+        <div class="member-info">
+          <div class="member-name">{{member.name}}</div>
+          <div class="bar-container">
+            <div class="bar-label">HP</div>
+            <div class="bar-bg bar-hp-bg">
+              <div class="bar-fill bar-hp-fill" style="width: {{member.healthPercent}}%"></div>
+            </div>
+          </div>
+          <div class="bar-container">
+            <div class="bar-label">MP</div>
+            <div class="bar-bg bar-mp-bg">
+              <div class="bar-fill bar-mp-fill" style="width: {{member.manaPercent or 0}}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </window>
+</html>
