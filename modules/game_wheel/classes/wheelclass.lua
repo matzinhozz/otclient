@@ -1844,7 +1844,7 @@ function WheelOfDestiny.create(playerId, canView, changeState, vocationId, point
   if WheelOfDestiny.vocationId == 0 then
     local player = g_game.getLocalPlayer()
     if player then
-      WheelOfDestiny.vocationId = translateWheelVocation[player:getVocation()]
+      WheelOfDestiny.vocationId = translateWheelVocation(player:getVocation())
     end
   end
 

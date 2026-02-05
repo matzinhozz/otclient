@@ -468,7 +468,18 @@ function pdumpWidgetId(widget, indent)
 end
 
 function translateVocation(id)
-	if id == 1 or id == 11 then
+	-- Terceira promoção / custom (antes dos padrões para id 11/13 etc.)
+	if id == 11 or id == 12 or id == 18 or id == 13 then
+		return 5 -- sorcerer wheel
+	elseif id == 19 or id == 20 or id == 21 then
+		return 9 -- monk wheel
+	elseif id == 17 or id == 22 or id == 23 or id == 16 then
+		return 8 -- knight wheel
+	elseif id == 14 then
+		return 6 -- druid wheel
+	elseif id == 15 then
+		return 7 -- paladin wheel
+	elseif id == 1 or id == 11 then
 		return 8 -- ek
 	elseif id == 2 or id == 12 then
 		return 7 -- rp

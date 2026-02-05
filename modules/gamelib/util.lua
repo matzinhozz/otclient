@@ -100,7 +100,8 @@ function translateWheelVocation(id)
 	if type(id) == "string" then
 		id = tonumber(id)
 	end
-	
+
+	-- Knight family (1 = wheel Knight)
 	if id == 1 or id == 11 then
 		return 1 -- ek
 	elseif id == 2 or id == 12 then
@@ -109,23 +110,46 @@ function translateWheelVocation(id)
 		return 3 -- ms
 	elseif id == 4 or id == 14 then
 		return 4 -- ed
-  elseif id == 5 or id == 15 then
-    return 5 -- em
+	elseif id == 5 or id == 15 then
+		return 5 -- em
 	end
-  return 0
+
+	-- Third promotion / custom vocations (server vocation ids)
+	-- Sorcerer wheel: Infernalist (11), Master Infernalist (12), Diabolic Master Infernalist (18)
+	if id == 11 or id == 12 or id == 18 then
+		return 3
+	end
+	-- Monk wheel: Knocker (19), Champion Knocker (20), Furious Champion Knocker (21)
+	if id == 19 or id == 20 or id == 21 then
+		return 5
+	end
+	-- Knight wheel: Drunou (22), Lord Drunou (23), Gallant Lord Drunou (17)
+	if id == 17 or id == 22 or id == 23 then
+		return 1
+	end
+	-- Druid/Paladin third promotions if any (13, 14, 15, 16)
+	if id == 13 then return 3 end -- Wise Master Sorcerer
+	if id == 14 then return 4 end -- Ancient Elder Druid
+	if id == 15 then return 2 end -- Templar Royal Paladin
+	if id == 16 then return 1 end -- Glorious Elite Knight
+
+	return 0
 end
 
 -- servers may have different id's, change if not working properly (only for protocols 910+)
 function getVocationSt(id)
-  if id == 1 or id == 11 then
+  -- Knight wheel: Knight (1,11), Drunou line (17,22,23), Glorious Elite Knight (16)
+  if id == 1 or id == 11 or id == 16 or id == 17 or id == 22 or id == 23 then
     return "K0"
-  elseif id == 2 or id == 12 then
+  elseif id == 2 or id == 12 or id == 15 then
     return "P0"
-  elseif id == 3 or id == 13 then
+  -- Sorcerer wheel: Sorcerer (3,13), Infernalist line (11,12,18), Wise Master Sorcerer (13)
+  elseif id == 3 or id == 13 or id == 11 or id == 12 or id == 18 then
     return "S0"
   elseif id == 4 or id == 14 then
     return "D0"
-  elseif id == 5 or id == 15 then
+  -- Monk wheel: Monk (5,15), Knocker line (19,20,21)
+  elseif id == 5 or id == 15 or id == 19 or id == 20 or id == 21 then
     return "M0"
   end
   return "N"
