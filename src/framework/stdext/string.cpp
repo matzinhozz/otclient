@@ -323,4 +323,50 @@ namespace stdext
 
         return out;
     }
+
+    [[nodiscard]] std::string formatDamageKK(uint64_t value) {
+        if (value < 1000) {
+            return std::to_string(value);
+        }
+
+        if (value < 1000000) {
+            // K format
+            const uint64_t thousands = value / 1000;
+            const uint64_t remainder = value % 1000;
+            
+            if (remainder == 0) {
+                return std::to_string(thousands) + "K";
+            }
+            
+            // Show 1 decimal place
+            const uint64_t decimal = (remainder * 10) / 1000;
+            return std::to_string(thousands) + "." + std::to_string(decimal) + "K";
+        }
+
+        if (value < 1000000000) {
+            // KK format
+            const uint64_t millions = value / 1000000;
+            const uint64_t remainder = value % 1000000;
+            
+            if (remainder == 0) {
+                return std::to_string(millions) + "KK";
+            }
+            
+            // Show 1 decimal place
+            const uint64_t decimal = (remainder * 10) / 1000000;
+            return std::to_string(millions) + "." + std::to_string(decimal) + "KK";
+        }
+
+        // KKK format
+        const uint64_t billions = value / 1000000000;
+        const uint64_t remainder = value % 1000000000;
+        
+        if (remainder == 0) {
+            return std::to_string(billions) + "KKK";
+        }
+        
+        // Show 1 decimal place
+        const uint64_t decimal = (remainder * 10) / 1000000000;
+        return std::to_string(billions) + "." + std::to_string(decimal) + "KKK";
+    }
 }
